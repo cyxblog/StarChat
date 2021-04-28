@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">StarChat</string>
+    <string name="settings">设置</string>
+    <string name="anonymity">无名氏</string>
+    <string name="chatRoom">聊天室</string>
+    <string name="starChatData">starChatData</string>
+    <string name="nickname">nickname</string>
+    <string name="client">客户端</string>
+    <string name="role">role</string>
+    <string name="device_role">设备角色</string>
+    <string name="server">服务器</string>
+    <string name="serverIP">serverIP</string>
+    <string name="usable">可用</string>
+    <string name="connecting">连接中</string>
+    <string name="connected">已连接</string>
+    <string name="send">发送</string>
+    <string name="find_device">发现设备</string>
+    <string name="out_group">退出群组</string>
+    <string name="in_chat_room">进入聊天室</string>
+    <string name="usable_device">可用设备</string>
+    <string name="chat_room_member">聊天室成员</string>
+    <string name="chat_room_nickname">聊天室昵称</string>
+    <string name="cancel">取消</string>
+    <string name="enter">确定</string>
+</resources>
