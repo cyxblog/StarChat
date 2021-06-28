@@ -17,7 +17,7 @@ import android.text.TextUtils;
 
 import androidx.core.app.ActivityCompat;
 
-import com.example.starchat.MainActivity;
+import com.example.starchat.activity.MainActivity;
 import com.example.starchat.jiekou.WifiActionListener;
 
 import java.util.ArrayList;

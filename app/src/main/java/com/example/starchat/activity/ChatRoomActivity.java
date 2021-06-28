@@ -1,10 +1,9 @@
-package com.example.starchat;
+package com.example.starchat.activity;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
@@ -54,12 +53,13 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.app.filepicker.FilePicker;
-import com.app.filepicker.OnFilePickerSelectListener;
 import com.app.filepicker.model.EssFile;
+import com.example.starchat.R;
 import com.example.starchat.adapter.MessageAdapter;
 
 import com.example.starchat.bean.MessageBean;
 import com.example.starchat.service.ServerService;
+import com.example.starchat.util.DataHandleUtil;
 import com.example.starchat.util.FileUtil;
 import com.example.starchat.util.GsonUtil;
 import com.example.starchat.util.MsgTypeUtil;
@@ -87,13 +87,13 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
-import top.zibin.luban.CompressionPredicate;
 import top.zibin.luban.Luban;
 import top.zibin.luban.OnCompressListener;
 
 
 /**
  * 聊天室页面，收发消息模块
+ *
  * @author 陈
  */
 public class ChatRoomActivity extends AppCompatActivity {
@@ -147,10 +147,10 @@ public class ChatRoomActivity extends AppCompatActivity {
     public ServiceConnection mServiceConnection;
 
     //创建Handler执行UI更新，在聊天界面更新消息
-    private Handler mHandler = new Handler(msg -> {
+    private final Handler mHandler = new Handler(msg -> {
         switch (msg.what) {
             case SHOW_ON_CHAT_LIST_CODE:
-                showMessageOnChatRoom((String) msg.obj);
+                showMessages((String) msg.obj);
                 break;
             case SHOW_ON_DIALOG_CODE:
                 showDialog();
@@ -166,10 +166,12 @@ public class ChatRoomActivity extends AppCompatActivity {
     private ImageView mImgAudio;
     private Button mBnAudio;
     private File mAudioDir;
+    private String originalProfilePath;
 
 
     /**
      * onCreate()阶段，主要用于初始化参数
+     *
      * @param savedInstanceState 实例状态
      */
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
@@ -185,7 +187,7 @@ public class ChatRoomActivity extends AppCompatActivity {
         initEvent();
 
         //初始化设备角色，服务器或客户端，由SharedPreferences文件决定
-        initServerOrClient();
+        initDeviceRole();
 
     }
 
@@ -209,6 +211,8 @@ public class ChatRoomActivity extends AppCompatActivity {
         //初始化SharedPreferences
         mSharedPreferences = getSharedPreferences(getString(R.string.starChatData), MODE_PRIVATE);
         mNickname = mSharedPreferences.getString(getString(R.string.nickname), getString(R.string.anonymity));
+
+        originalProfilePath = mSharedPreferences.getString("profile_path", "");
 
         //设置标题栏
         ActionBar actionBar = getSupportActionBar();
@@ -234,51 +238,45 @@ public class ChatRoomActivity extends AppCompatActivity {
     private void initEvent() {
 
         //监听语音输入按钮
-        mImgAudio.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                requestPermission();
-                if (!permissionGranted()) {
-                    return;
+        mImgAudio.setOnClickListener(v -> {
+            requestPermission();
+            if (!permissionGranted()) {
+                return;
+            }
+            if (mInputText.getVisibility() == View.VISIBLE) {
+                mInputText.setVisibility(View.GONE);
+                mBnAudio.setVisibility(View.VISIBLE);
+                mImgAudio.setImageResource(R.drawable.keyboard);
+                InputMethodManager inputMethodManager = (InputMethodManager) ChatRoomActivity.this.getSystemService(INPUT_METHOD_SERVICE);
+                if (inputMethodManager != null) {
+                    inputMethodManager.hideSoftInputFromWindow(v.getWindowToken(), 0);
                 }
-                if (mInputText.getVisibility() == View.VISIBLE) {
-                    mInputText.setVisibility(View.GONE);
-                    mBnAudio.setVisibility(View.VISIBLE);
-                    mImgAudio.setImageResource(R.drawable.keyboard);
-                    InputMethodManager inputMethodManager = (InputMethodManager) ChatRoomActivity.this.getSystemService(INPUT_METHOD_SERVICE);
-                    if (inputMethodManager != null) {
-                        inputMethodManager.hideSoftInputFromWindow(v.getWindowToken(), 0);
-                    }
 
-                    AudioRecordManager.getInstance(ChatRoomActivity.this).setMaxVoiceDuration(60);
-                    mAudioDir = new File(getExternalCacheDir().getAbsolutePath() + File.separator + "AUDIO");
-                    if (!mAudioDir.exists()) {
-                        mAudioDir.mkdir();
-                    }
-                    mAudioDir = new File(mAudioDir.getAbsolutePath() + File.separator + "self");
-                    if (!mAudioDir.exists()) {
-                        mAudioDir.mkdir();
-                    }
-                    AudioRecordManager.getInstance(ChatRoomActivity.this).setAudioSavePath(mAudioDir.getAbsolutePath());
-                    if (mMoreFuncLayout.getVisibility() == View.VISIBLE) {
-                        mMoreFuncLayout.setVisibility(View.GONE);
-                    }
-                } else {
-                    mInputText.setVisibility(View.VISIBLE);
-                    mBnAudio.setVisibility(View.GONE);
-                    mImgAudio.setImageResource(R.drawable.mic);
+                AudioRecordManager.getInstance(ChatRoomActivity.this).setMaxVoiceDuration(60);
+                mAudioDir = new File(getExternalCacheDir().getAbsolutePath() + File.separator + "AUDIO");
+                if (!mAudioDir.exists()) {
+                    mAudioDir.mkdir();
                 }
+                mAudioDir = new File(mAudioDir.getAbsolutePath() + File.separator + "self");
+                if (!mAudioDir.exists()) {
+                    mAudioDir.mkdir();
+                }
+                AudioRecordManager.getInstance(ChatRoomActivity.this).setAudioSavePath(mAudioDir.getAbsolutePath());
+                if (mMoreFuncLayout.getVisibility() == View.VISIBLE) {
+                    mMoreFuncLayout.setVisibility(View.GONE);
+                }
+            } else {
+                mInputText.setVisibility(View.VISIBLE);
+                mBnAudio.setVisibility(View.GONE);
+                mImgAudio.setImageResource(R.drawable.mic);
             }
         });
 
         //监听更多按钮的点击
-        mMoreImg.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                mMoreFuncLayout.setVisibility(View.VISIBLE);
-                if (mMessageAdapter.getItemCount() - 1 > 0) {
-                    mMsgListView.smoothScrollToPosition(mMessageAdapter.getItemCount() - 1);
-                }
+        mMoreImg.setOnClickListener(v -> {
+            mMoreFuncLayout.setVisibility(View.VISIBLE);
+            if (mMessageAdapter.getItemCount() - 1 > 0) {
+                mMsgListView.smoothScrollToPosition(mMessageAdapter.getItemCount() - 1);
             }
         });
 
@@ -389,11 +387,11 @@ public class ChatRoomActivity extends AppCompatActivity {
                 messageBean.fileType = -1;
                 messageBean.audioLength = duration + "″";
                 messageBean.profilePath = mSharedPreferences.getString("profile_path", "");
-                showMessageOnChatRoom(GsonUtil.toJsonStr(messageBean));
+                showMessages(GsonUtil.toJsonStr(messageBean));
                 if (mRole.equals("客户端")) {
                     new Thread(() -> {
                         try {
-                            sendPicOrFile(file, messageBean);
+                            sendFile(file, messageBean);
                             Log.d(TAG, "Audio run: " + GsonUtil.toJsonStr(messageBean));
                         } catch (IOException e) {
                             e.printStackTrace();
@@ -451,34 +449,30 @@ public class ChatRoomActivity extends AppCompatActivity {
         });
 
         //监听发送按钮的点击事件
-        mBnSendMsg.setOnClickListener(new View.OnClickListener() {
-            @RequiresApi(api = Build.VERSION_CODES.KITKAT)
-            @Override
-            public void onClick(View v) {
-                //将数据转化成Json格式
-                MessageBean messageBean = new MessageBean();
-                messageBean.time = TimeUtil.getCurrentTime();
-                messageBean.nickname = mNickname;
-                messageBean.msg = mInputText.getText().toString();
-                messageBean.type = MsgTypeUtil.SELF_MSG;
-                messageBean.profilePath = mSharedPreferences.getString("profile_path", "");
-                showMessageOnChatRoom(GsonUtil.toJsonStr(messageBean));
-                if (mRole.equals(getString(R.string.client))) {
-                    mMsgToServer = GsonUtil.toJsonStr(messageBean);
-                    new Thread(() -> {
-                        try {
-                            sendMessage(mMsgToServer, mClientSocket);
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }).start();
-                } else {
-                    mIntent.putExtra("action", "text");
-                    mIntent.putExtra("text", GsonUtil.toJsonStr(messageBean));
-                    startService(mIntent);
-                }
-                mInputText.setText("");
+        mBnSendMsg.setOnClickListener(v -> {
+            //将数据转化成Json格式
+            MessageBean messageBean = new MessageBean();
+            messageBean.time = TimeUtil.getCurrentTime();
+            messageBean.nickname = mNickname;
+            messageBean.msg = mInputText.getText().toString();
+            messageBean.type = MsgTypeUtil.SELF_MSG;
+            messageBean.profilePath = mSharedPreferences.getString("profile_path", "");
+            showMessages(GsonUtil.toJsonStr(messageBean));
+            if (mRole.equals(getString(R.string.client))) {
+                mMsgToServer = GsonUtil.toJsonStr(messageBean);
+                new Thread(() -> {
+                    try {
+                        sendTextMessages(mMsgToServer, mClientSocket);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }).start();
+            } else {
+                mIntent.putExtra("action", "text");
+                mIntent.putExtra("text", GsonUtil.toJsonStr(messageBean));
+                startService(mIntent);
             }
+            mInputText.setText("");
         });
 
         //监听消息列表滚动时隐藏软键盘
@@ -506,17 +500,17 @@ public class ChatRoomActivity extends AppCompatActivity {
             messageBean.profilePath = mSharedPreferences.getString("profile_path", "");
 
             if (!messageBean.msg.equals("无法定位")) {
-                showMessageOnChatRoom(GsonUtil.toJsonStr(messageBean));
+                showMessages(GsonUtil.toJsonStr(messageBean));
                 new Thread(() -> {
                     try {
                         if (mRole.equals("客户端")) {
-                            sendMessage(GsonUtil.toJsonStr(messageBean), mClientSocket);
+                            sendTextMessages(GsonUtil.toJsonStr(messageBean), mClientSocket);
                         } else {
                             mIntent.putExtra("action", "location");
                             mIntent.putExtra("location_info", GsonUtil.toJsonStr(messageBean));
                             startService(mIntent);
                         }
-                    }catch (IOException e){
+                    } catch (IOException e) {
                         e.printStackTrace();
                     }
                 }).start();
@@ -533,41 +527,38 @@ public class ChatRoomActivity extends AppCompatActivity {
         //打开文件夹，选择文件
         mFileImg.setOnClickListener(v -> FilePicker.chooseForMimeType().setTheme(R.style.FilePicker_Elec).setMaxCount(10)
                 .setFileTypes("docx", "pptx", "xlsx", "pdf", "zip", "mp3", "mp4")
-                .selectFiles(new OnFilePickerSelectListener() {
-                    @Override
-                    public void onFilePickerResult(List<EssFile> essFiles) {
-                        for (EssFile essFile : essFiles) {
-                            mMoreFuncLayout.setVisibility(View.GONE);
-                            Log.d(TAG, "onFilePickerResult: ok");
-                            MessageBean messageBean = new MessageBean();
-                            messageBean.nickname = mNickname;
-                            messageBean.time = TimeUtil.getCurrentTime();
-                            messageBean.type = MsgTypeUtil.SELF_FILE;
-                            messageBean.fileName = essFile.getName();
-                            messageBean.fileType = FileUtil.getFileType(essFile.getName());
-                            messageBean.profilePath = mSharedPreferences.getString("profile_path", "");
-                            Log.d(TAG, "onFilePickerResult: " + messageBean.fileType);
-                            messageBean.fileLength = FileUtil.getFileLength(essFile.getFile());
-                            messageBean.filePath = essFile.getAbsolutePath();
-                            showMessageOnChatRoom(GsonUtil.toJsonStr(messageBean));
+                .selectFiles(essFiles -> {
+                    for (EssFile essFile : essFiles) {
+                        mMoreFuncLayout.setVisibility(View.GONE);
+                        Log.d(TAG, "onFilePickerResult: ok");
+                        MessageBean messageBean = new MessageBean();
+                        messageBean.nickname = mNickname;
+                        messageBean.time = TimeUtil.getCurrentTime();
+                        messageBean.type = MsgTypeUtil.SELF_FILE;
+                        messageBean.fileName = essFile.getName();
+                        messageBean.fileType = FileUtil.getFileIcon(essFile.getName());
+                        messageBean.profilePath = mSharedPreferences.getString("profile_path", "");
+                        Log.d(TAG, "onFilePickerResult: " + messageBean.fileType);
+                        messageBean.fileLength = FileUtil.getFileLength(essFile.getFile());
+                        messageBean.filePath = essFile.getAbsolutePath();
+                        showMessages(GsonUtil.toJsonStr(messageBean));
 
-                            File file = essFile.getFile();
+                        File file = essFile.getFile();
 
-                            new Thread(() -> {
-                                try {
-                                    if (mRole.equals("客户端")) {
-                                        sendPicOrFile(file, messageBean);
-                                    } else {
-                                        mIntent.putExtra("action", "file");
-                                        mIntent.putExtra("file_info", GsonUtil.toJsonStr(messageBean));
-                                        startService(mIntent);
-                                    }
-                                } catch (IOException e) {
-                                    e.printStackTrace();
+                        new Thread(() -> {
+                            try {
+                                if (mRole.equals("客户端")) {
+                                    sendFile(file, messageBean);
+                                } else {
+                                    mIntent.putExtra("action", "file");
+                                    mIntent.putExtra("file_info", GsonUtil.toJsonStr(messageBean));
+                                    startService(mIntent);
                                 }
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
 
-                            }).start();
-                        }
+                        }).start();
                     }
                 }).start(ChatRoomActivity.this));
 
@@ -575,6 +566,7 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     /**
      * 获得设备定位信息
+     *
      * @return 设备经纬度组成的字符串
      */
     private String getDeviceLocation() {
@@ -590,13 +582,6 @@ public class ChatRoomActivity extends AppCompatActivity {
         String deviceLocation = "无法定位";
         if (provider != null) {
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                // TODO: Consider calling
-                //    ActivityCompat#requestPermissions
-                // here to request the missing permissions, and then overriding
-                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                //                                          int[] grantResults)
-                // to handle the case where the user grants the permission. See the documentation
-                // for ActivityCompat#requestPermissions for more details.
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
             }
             location = locationManager.getLastKnownLocation(provider);
@@ -617,6 +602,7 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     /**
      * 检查设备是否授予
+     *
      * @return true:被授予 false:未被授予
      */
     private boolean permissionGranted() {
@@ -627,15 +613,45 @@ public class ChatRoomActivity extends AppCompatActivity {
     }
 
     /**
+     * 发送文本消息给服务器
+     *
+     * @param content 消息对应的Json格式字符串
+     * @param socket  客户端socket
+     * @throws IOException socket传输消息抛出异常
+     */
+    private void sendTextMessages(String content, Socket socket) throws IOException {
+        DataOutputStream dos;
+        if (socket != null) {
+            dos = new DataOutputStream(socket.getOutputStream());
+        } else {
+            return;
+        }
+
+        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(content.getBytes());
+
+        int length;
+        byte[] buffer = new byte[1024];
+        dos.write(MsgTypeUtil.SELF_MSG);
+        while ((length = byteArrayInputStream.read(buffer)) != -1) {
+            DataHandleUtil.encodeData(buffer);
+            dos.write(buffer, 0, length);
+            dos.flush();
+        }
+
+        dos.write(DataHandleUtil.encodeData("\t\r".getBytes()));
+
+    }
+
+    /**
      * 客户端发送图片或文件到服务器
-     * @param file 发送的文件
+     *
+     * @param file        发送的文件
      * @param messageBean 对应要发送的消息标志，来分辨消息类型
      * @throws IOException 抛出IOException
      */
-    public void sendPicOrFile(File file, MessageBean messageBean) throws IOException {
+    public void sendFile(File file, MessageBean messageBean) throws IOException {
         Log.d(TAG, "sendPicOrFile: " + messageBean.type);
         DataOutputStream dos = new DataOutputStream(mClientSocket.getOutputStream());
-        FileInputStream fileInputStream = new FileInputStream(file);
 
         int length;
         byte[] buffer = new byte[1024];
@@ -661,11 +677,15 @@ public class ChatRoomActivity extends AppCompatActivity {
         dos.write(GsonUtil.toJsonStr(messageBean).getBytes());
         dos.flush();
 
+        FileInputStream fileInputStream;
+        fileInputStream = new FileInputStream(file);
+
         while ((length = fileInputStream.read(buffer)) != -1) {
+            DataHandleUtil.encodeData(buffer);
             dos.write(buffer, 0, length);
             dos.flush();
         }
-        dos.write("\t\r".getBytes());
+        dos.write(DataHandleUtil.encodeData("\t\r".getBytes()));
     }
 
     /**
@@ -673,7 +693,7 @@ public class ChatRoomActivity extends AppCompatActivity {
      * 若为服务器，则绑定ServerService，开启服务器；
      * 若为客户端，则使用Socket连接到服务器。
      */
-    private void initServerOrClient() {
+    private void initDeviceRole() {
         //从SharedPreferences取出设备角色，如果是客户端，则连接服务器；反之，启动服务器
         SharedPreferences sharedPreferences = getSharedPreferences(getString(R.string.starChatData), MODE_PRIVATE);
         mRole = sharedPreferences.getString(getString(R.string.role), null);
@@ -685,7 +705,6 @@ public class ChatRoomActivity extends AppCompatActivity {
                 new Thread(() -> {
                     try {
                         mClientSocket = new Socket(serverIP, SocketUtil.PORT);
-                        sendPersonalInfo();
                         new Thread(new ClientThread(mClientSocket)).start();
                     } catch (IOException e) {
                         //未连接到服务器，弹窗提示
@@ -720,13 +739,6 @@ public class ChatRoomActivity extends AppCompatActivity {
     }
 
     /**
-     * TODO
-     */
-    private void sendPersonalInfo() {
-
-    }
-
-    /**
      * 客户端专属弹窗，若未连接到服务器，则弹出。
      */
     private void showDialog() {
@@ -746,43 +758,16 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     /**
      * 将消息显示在聊天窗口
+     *
      * @param strJson 消息对应的Json格式字符串
      */
-    private void showMessageOnChatRoom(String strJson) {
+    private void showMessages(String strJson) {
         MessageBean messageBean = GsonUtil.getObject(strJson);
         mMessageBeans.add(messageBean);
         mMessageAdapter.notifyDataSetChanged();
         if (mMessageAdapter.getItemCount() > 0) {
             mLayoutManager.scrollToPositionWithOffset(mMessageAdapter.getItemCount() - 1, 0);
         }
-    }
-
-    /**
-     * 发送文本消息给服务器
-     * @param content 消息对应的Json格式字符串
-     * @param socket 客户端socket
-     * @throws IOException socket传输消息抛出异常
-     */
-    private void sendMessage(String content, Socket socket) throws IOException {
-        DataOutputStream dos;
-        if (socket != null) {
-            dos = new DataOutputStream(socket.getOutputStream());
-        } else {
-            return;
-        }
-
-        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(content.getBytes());
-
-        int length;
-        byte[] buffer = new byte[1024];
-        dos.write(MsgTypeUtil.SELF_MSG);
-        while ((length = byteArrayInputStream.read(buffer)) != -1) {
-            dos.write(buffer, 0, length);
-            dos.flush();
-        }
-
-        dos.write("\t\r".getBytes());
-
     }
 
     /**
@@ -808,46 +793,14 @@ public class ChatRoomActivity extends AppCompatActivity {
 
                     flag = dis.read();
 
-                    if (flag == 123) {//接收服务器的信息并发送个人信息到服务器
-
-                        //接收服务器的信息保存到数据库
-                        receivePersonalInfo(dis);
-
-                        //发送个人信息到服务器
-                        int length;
-                        byte[] buffer = new byte[1024];
-
-                        DataOutputStream dos = new DataOutputStream(mClientSocket.getOutputStream());
-                        String path = mSharedPreferences.getString("profile_path", null);
-                        dos.write(124);
-
-                        if (mNickname != null) {
-                            dos.write(mNickname.getBytes().length);
-                            dos.write(mNickname.getBytes());
-                        } else {
-                            dos.write("无名氏".getBytes().length);
-                            dos.write("无名氏".getBytes());
-                        }
-
-                        if (path != null) {
-                            dos.write(1);
-                            FileInputStream fis = new FileInputStream(new File(path));
-                            while ((length = fis.read(buffer)) != -1) {
-                                dos.write(buffer, 0, length);
-                            }
-                            dos.write('\t');
-                            dos.write('\r');
-                        } else {
-                            dos.write(0);
-                        }
-                    } else if (flag == 124) {//新加入的成员信息并保存至数据库
-                        receivePersonalInfo(dis);
-                    } else if (flag == MsgTypeUtil.SELF_IMG) {//图片
-                        receivePicOrFile(dis, MsgTypeUtil.OTHERS_IMG);
+                    if (flag == MsgTypeUtil.SELF_IMG) {//图片
+                        receiveFile(dis, MsgTypeUtil.OTHERS_IMG);
                     } else if (flag == MsgTypeUtil.SELF_FILE) {//文件
-                        receivePicOrFile(dis, MsgTypeUtil.OTHERS_FILE);
+                        receiveFile(dis, MsgTypeUtil.OTHERS_FILE);
                     } else if (flag == MsgTypeUtil.SELF_AUDIO) {//语音
-                        receivePicOrFile(dis, MsgTypeUtil.OTHERS_AUDIO);
+                        receiveFile(dis, MsgTypeUtil.OTHERS_AUDIO);
+                    } else if (flag == MsgTypeUtil.SELF_PROFILE) {
+                        receiveFile(dis, MsgTypeUtil.OTHERS_PROFILE);
                     } else if (flag == MsgTypeUtil.SELF_MSG) {//文本
                         int length;
 
@@ -856,6 +809,7 @@ public class ChatRoomActivity extends AppCompatActivity {
                         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 
                         while ((length = dis.read(buffer)) != -1) {
+                            DataHandleUtil.decodeData(buffer);
                             byteArrayOutputStream.write(buffer, 0, length);
 
                             //传输结束标志
@@ -868,9 +822,24 @@ public class ChatRoomActivity extends AppCompatActivity {
 
                         MessageBean messageBean = GsonUtil.getObject(byteArrayOutputStream.toString());
                         if (messageBean != null) {
+                            //获得头像地址
+                            File profileDir = new File(getExternalCacheDir().getAbsolutePath() + File.separator +
+                                    "MEMBERS" + File.separator + socket.getInetAddress());
+                            String profilePath = null;
+                            if (profileDir.exists()) {
+                                File[] file1 = profileDir.listFiles();
+                                if (file1.length > 0) {
+                                    profilePath = profileDir.getAbsolutePath() + File.separator + file1[0].getName();
+                                }
+                            }
+                            if (profilePath != null) {
+                                Log.d(TAG, "receivePicOrFile: " + profilePath);
+                                messageBean.profilePath = profilePath;
+                            } else {
+                                messageBean.profilePath = "";
+                            }
                             messageBean.time = TimeUtil.getCurrentTime();
                             messageBean.type = MsgTypeUtil.OTHERS_MSG;
-                            messageBean.profilePath = getExternalCacheDir().getAbsolutePath() + File.separator + "MEMBER" + File.separator + messageBean.nickname + ".jpeg";
                             send2Handler(GsonUtil.toJsonStr(messageBean), SHOW_ON_CHAT_LIST_CODE, mHandler);
                         }
                     }
@@ -882,52 +851,118 @@ public class ChatRoomActivity extends AppCompatActivity {
             }
 
         }
-    }
 
-    /**
-     * 接收服务器发来的设备信息
-     * @param dis 数据输入流
-     * @throws IOException 输入流读取数据抛出异常
-     * TODO
-     */
-    public void receivePersonalInfo(DataInputStream dis) throws IOException {
-        int length = dis.read();
-        byte[] buffer = new byte[1024];
-        length = dis.read(buffer, 0, length);
-        String nickname = new String(buffer, 0, length);
-        int hasFile = dis.read();
-        if (hasFile == 1) {
-            File dir = new File(getExternalCacheDir().getAbsolutePath() + File.separator + "MEMBER");
+        /**
+         * 接收服务器发来的图片或其他文件
+         *
+         * @param dis  数据输入流
+         * @param type 消息类型，图片或文件
+         * @throws IOException 读取数据抛出异常
+         */
+        public void receiveFile(DataInputStream dis, int type) throws IOException {
+            int length = 0;
+            byte[] buffer = new byte[1024];
+            int offset;
+            while ((offset = dis.read()) != '\n') {
+                length += offset;
+            }
+
+            length = dis.read(buffer, 0, length);
+
+            String mark = new String(buffer, 0, length);
+
+            MessageBean fileBean = GsonUtil.getObject(mark);
+            String finalDirName;
+            if (type == MsgTypeUtil.OTHERS_FILE) {
+                finalDirName = "DOCUMENTS";
+            } else if (type == MsgTypeUtil.OTHERS_IMG) {
+                finalDirName = "IMAGES";
+            } else if (type == MsgTypeUtil.OTHERS_PROFILE) {
+                finalDirName = "MEMBERS";
+            } else {
+                finalDirName = "AUDIO";
+            }
+            File dir = new File(getExternalCacheDir().getAbsolutePath() + File.separator + finalDirName);
             boolean isMkdir = true;
-            File file;
             if (!dir.exists()) {
                 isMkdir = dir.mkdir();
             }
-            if (isMkdir) {
-                file = new File(dir.getAbsolutePath() + File.separator + nickname + ".jpeg");
-            } else {
-                file = new File(getExternalCacheDir().getAbsolutePath() + File.separator + nickname + ".jpeg");
+            if (type == MsgTypeUtil.OTHERS_AUDIO) {
+                dir = new File(dir.getAbsolutePath() + File.separator + "others");
+                if (!dir.exists()) {
+                    isMkdir = dir.mkdir();
+                }
+            } else if (type == MsgTypeUtil.OTHERS_PROFILE) {
+                dir = new File(dir.getAbsolutePath() + File.separator + socket.getInetAddress());
+                if (!dir.exists()) {
+                    isMkdir = dir.mkdir();
+                }
             }
-            FileOutputStream fos = new FileOutputStream(file);
+            File file;
+            if (isMkdir) {
+                file = new File(dir.getAbsolutePath() + File.separator + fileBean.fileName);
+            } else {
+                file = new File(getExternalCacheDir().getAbsolutePath() + File.separator + fileBean.fileName);
+            }
+
+            //清空MEMBERS下文件夹下的所有头像文件
+            if (type == MsgTypeUtil.OTHERS_PROFILE) {
+                File[] files = dir.listFiles();
+                if (files.length > 0){
+                    for (File file1 : files) {
+                        file1.delete();
+                    }
+                }
+            }
+            FileOutputStream fileOutputStream = new FileOutputStream(file);
+
             while ((length = dis.read(buffer)) != -1) {
-                fos.write(buffer, 0, length);
-                //传输结束标志
+                DataHandleUtil.decodeData(buffer);
+                fileOutputStream.write(buffer, 0, length);
+                fileOutputStream.flush();
+
                 if (length > 1 && buffer[length - 2] == '\t' && buffer[length - 1] == '\r') {
                     break;
                 } else if (length == 1 && buffer[length - 1] == '\r') {
                     break;
                 }
             }
-            //保存到数据库
-            saveToDB(nickname, file.getAbsolutePath());
-        } else {
-            saveToDB(nickname, null);
-        }
 
+            if (type != MsgTypeUtil.OTHERS_PROFILE) {
+                MessageBean messageBean = new MessageBean();
+                File profileDir = new File(getExternalCacheDir().getAbsolutePath() + File.separator +
+                        "MEMBERS" + File.separator + socket.getInetAddress());
+                String profilePath = null;
+                if (profileDir.exists()) {
+                    File[] file1 = profileDir.listFiles();
+                    if (file1.length > 0) {
+                        profilePath = profileDir.getAbsolutePath() + File.separator + file1[0].getName();
+                    }
+                }
+                if (profilePath != null) {
+                    Log.d(TAG, "receivePicOrFile: " + profilePath);
+                    messageBean.profilePath = profilePath;
+                } else {
+                    messageBean.profilePath = "";
+                }
+                messageBean.nickname = fileBean.nickname;
+                messageBean.type = type;
+                messageBean.time = TimeUtil.getCurrentTime();
+                messageBean.fileName = fileBean.fileName;
+                messageBean.filePath = file.getAbsolutePath();
+                if (type == MsgTypeUtil.OTHERS_AUDIO) {
+                    messageBean.audioLength = fileBean.audioLength;
+                }
+                messageBean.fileLength = FileUtil.getFileLength(file);
+                messageBean.fileType = fileBean.fileType;
+                send2Handler(GsonUtil.toJsonStr(messageBean), SHOW_ON_CHAT_LIST_CODE, mHandler);
+            }
+        }
     }
 
     /**
      * TODO
+     *
      * @param nickname
      * @param absolutePath
      */
@@ -936,86 +971,11 @@ public class ChatRoomActivity extends AppCompatActivity {
     }
 
     /**
-     * 接收服务器发来的图片或其他文件
-     * @param dis 数据输入流
-     * @param type 消息类型，图片或文件
-     * @throws IOException 读取数据抛出异常
-     */
-    public void receivePicOrFile(DataInputStream dis, int type) throws IOException {
-        int length = 0;
-        byte[] buffer = new byte[1024];
-        int offset;
-        while ((offset = dis.read()) != '\n') {
-            length += offset;
-        }
-        Log.d(TAG, "receivePicOrFile: " + length);
-
-        length = dis.read(buffer, 0, length);
-
-        String mark = new String(buffer, 0, length);
-
-        Log.d(TAG, "receivePicOrFile: " + mark);
-
-        MessageBean fileBean = GsonUtil.getObject(mark);
-        String finalDirName;
-        if (type == MsgTypeUtil.OTHERS_FILE) {
-            finalDirName = "DOCUMENTS";
-        } else if (type == MsgTypeUtil.OTHERS_IMG) {
-            finalDirName = "IMAGES";
-        } else {
-            finalDirName = "AUDIO";
-        }
-        File dir = new File(getExternalCacheDir().getAbsolutePath() + File.separator + finalDirName);
-        boolean isMkdir = true;
-        if (!dir.exists()) {
-            isMkdir = dir.mkdir();
-        }
-        if (type == MsgTypeUtil.OTHERS_AUDIO) {
-            dir = new File(dir.getAbsolutePath() + File.separator + "others");
-            if (!dir.exists()) {
-                isMkdir = dir.mkdir();
-            }
-        }
-        File file;
-        if (isMkdir) {
-            file = new File(dir.getAbsolutePath() + File.separator + fileBean.fileName);
-        } else {
-            file = new File(getExternalCacheDir().getAbsolutePath() + File.separator + fileBean.fileName);
-        }
-        Log.d(TAG, "receivePicOrFile: " + file.getAbsolutePath());
-        FileOutputStream fileOutputStream = new FileOutputStream(file);
-
-        while ((length = dis.read(buffer)) != -1) {
-            fileOutputStream.write(buffer, 0, length);
-            fileOutputStream.flush();
-
-            if (length > 1 && buffer[length - 2] == '\t' && buffer[length - 1] == '\r') {
-                break;
-            } else if (length == 1 && buffer[length - 1] == '\r') {
-                break;
-            }
-        }
-
-        MessageBean messageBean = new MessageBean();
-        messageBean.nickname = fileBean.nickname;
-        messageBean.type = type;
-        messageBean.time = TimeUtil.getCurrentTime();
-        messageBean.fileName = fileBean.fileName;
-        messageBean.profilePath = getExternalCacheDir().getAbsolutePath() + File.separator + "MEMBER" + File.separator + fileBean.nickname + ".jpeg";
-        messageBean.filePath = file.getAbsolutePath();
-        if (type == MsgTypeUtil.OTHERS_AUDIO) {
-            messageBean.audioLength = fileBean.audioLength;
-        }
-        messageBean.fileLength = FileUtil.getFileLength(file);
-        messageBean.fileType = fileBean.fileType;
-        send2Handler(GsonUtil.toJsonStr(messageBean), SHOW_ON_CHAT_LIST_CODE, mHandler);
-    }
-
-    /**
      * 获得图片选择器的结果
+     *
      * @param requestCode 请求码
-     * @param resultCode 结果码
-     * @param data 获得的图片数据
+     * @param resultCode  结果码
+     * @param data        获得的图片数据
      */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
@@ -1042,12 +1002,7 @@ public class ChatRoomActivity extends AppCompatActivity {
                         .load(uri)
                         .ignoreBy(-1)
                         .setTargetDir(path)
-                        .filter(new CompressionPredicate() {
-                            @Override
-                            public boolean apply(String path) {
-                                return !(TextUtils.isEmpty(path) || path.toLowerCase().endsWith(".gif"));
-                            }
-                        })
+                        .filter(path1 -> !(TextUtils.isEmpty(path1) || path1.toLowerCase().endsWith(".gif")))
                         .setCompressListener(new OnCompressListener() {
                             @Override
                             public void onStart() {
@@ -1069,7 +1024,7 @@ public class ChatRoomActivity extends AppCompatActivity {
                                 messageBean.profilePath = mSharedPreferences.getString("profile_path", "");
                                 messageBean.fileType = -1;
                                 Log.d(TAG, "onSuccess: " + FileUtil.getFileLength(file));
-                                showMessageOnChatRoom(GsonUtil.toJsonStr(messageBean));
+                                showMessages(GsonUtil.toJsonStr(messageBean));
 
                                 new Thread(() -> {
                                     //发送图片
@@ -1078,11 +1033,11 @@ public class ChatRoomActivity extends AppCompatActivity {
                                             if (mClientSocket == null) {
                                                 return;
                                             }
-                                            sendPicOrFile(file, messageBean);
+                                            sendFile(file, messageBean);
                                         } else {
                                             String fileStr = GsonUtil.toJsonStr(messageBean);
                                             mIntent.putExtra("action", "picture");
-                                            mIntent.putExtra("info", fileStr);
+                                            mIntent.putExtra("picture_info", fileStr);
                                             startService(mIntent);
                                         }
 
@@ -1104,8 +1059,9 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     /**
      * 交给Handler处理数据
+     *
      * @param content 数据
-     * @param what 对应码
+     * @param what    对应码
      * @param handler mHandler
      */
     public void send2Handler(String content, int what, Handler handler) {
@@ -1126,6 +1082,7 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     /**
      * 创建右上角菜单
+     *
      * @param menu 菜单列表
      */
     @Override
@@ -1136,6 +1093,7 @@ public class ChatRoomActivity extends AppCompatActivity {
 
     /**
      * 点击菜单进入SettingActivity
+     *
      * @param item 菜单项
      */
     @Override
@@ -1151,15 +1109,38 @@ public class ChatRoomActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    //返回到ChatRoomActivity时，取出更新后的nickname，恢复服务
-
-    /**
-     * 在SettingActivity修改nickname后从SharedPreferences中取出nickname。
-     */
     @Override
-    protected void onStart() {
-        super.onStart();
-        mNickname = mSharedPreferences.getString(getString(R.string.nickname), getString(R.string.anonymity));
+    protected void onResume() {
+        super.onResume();
+        mNickname = mSharedPreferences.getString("nickname", "无名氏");
+        String profilePath = mSharedPreferences.getString("profile_path", "");
+        if(!profilePath.equals(originalProfilePath)){
+            Log.d(TAG, "onStart: " + profilePath);
+            if (!profilePath.equals("")) {
+                File file = new File(profilePath);
+                MessageBean messageBean = new MessageBean();
+                messageBean.nickname = mNickname;
+                messageBean.type = MsgTypeUtil.SELF_PROFILE;
+                messageBean.fileName = file.getName();
+                messageBean.filePath = profilePath;
+
+                if (mClientSocket != null && mRole.equals("客户端")) {
+                    new Thread(() -> {
+                        try {
+                            sendFile(file, messageBean);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }).start();
+                }
+                if (mRole.equals("服务器")) {
+                    mIntent.putExtra("action", "profile");
+                    mIntent.putExtra("profile_info", GsonUtil.toJsonStr(messageBean));
+                    startService(mIntent);
+                }
+
+            }
+        }
     }
 
     /**
@@ -1171,7 +1152,7 @@ public class ChatRoomActivity extends AppCompatActivity {
         Log.d(TAG, "onDestroy: ");
         if (mRole.equals("服务器")) {
             unbindService(mServiceConnection);
-            mServiceConnection = null;
+            stopService(mIntent);
         }
     }
 }

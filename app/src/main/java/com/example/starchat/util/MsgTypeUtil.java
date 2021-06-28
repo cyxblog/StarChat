@@ -22,4 +22,9 @@ public class MsgTypeUtil {
     public static final int SELF_AUDIO = 6;
     //其他设备发出的语音
     public static final int OTHERS_AUDIO = 7;
+
+    //本设备的头像
+    public static final int SELF_PROFILE = 8;
+    //其他设备的头像
+    public static final int OTHERS_PROFILE = 9;
 }

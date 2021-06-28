@@ -1,5 +1,12 @@
 package com.example.starchat.util;
 
+import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
+import android.util.Log;
+
+import androidx.core.content.FileProvider;
+
 import com.example.starchat.R;
 
 import java.io.File;
@@ -26,7 +33,7 @@ public class FileUtil {
     }
 
     //获得文件后缀，返回对应图标
-    public static int getFileType(String fileName) {
+    public static int getFileIcon(String fileName) {
         String fileSuffix = fileName.split("\\.")[fileName.split("\\.").length - 1];
         switch (fileSuffix) {
             case "docx":
@@ -85,5 +92,20 @@ public class FileUtil {
             type = "*/*";
         }
         return type;
+    }
+
+    /**
+     * 查看文件
+     * @param path 文件路径
+     */
+    public static void openFileByPath(String path, Context context) {
+        File file = new File(path);
+        Intent intent = new Intent("android.intent.action.VIEW");
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        Uri uri = FileProvider.getUriForFile(context, "com.example.starchat.fileprovider", file);
+        String type = FileUtil.getMIMEType(file);
+        intent.addCategory("android.intent.category.DEFAULT");
+        intent.setDataAndType(uri, type);
+        context.startActivity(intent);
     }
 }

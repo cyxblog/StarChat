@@ -30,20 +30,20 @@
             android:name="com.amap.api.v2.apikey"
             android:value="cbfe193b46d996453dbace84e3a3746c" />
 
-        <activity android:name=".MainActivity">
+        <activity android:name=".activity.MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".ChatRoomActivity" />
+        <activity android:name=".activity.ChatRoomActivity" />
         <activity
-            android:name=".SettingActivity"
+            android:name=".activity.SettingActivity"
             android:label="设置" />
 
         <provider
-            android:name=".DemoProvider"
+            android:name=".others.DemoProvider"
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">

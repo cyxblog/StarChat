@@ -257,7 +257,7 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             ((LeftFileInnerHolder) holder).mOpenFile.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    openFileByPath(mMessageBeans.get(position).filePath);
+                    FileUtil.openFileByPath(mMessageBeans.get(position).filePath, mContext);
                 }
             });
 
@@ -266,7 +266,7 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             ((RightFileInnerHolder) holder).mOpenFile.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    openFileByPath(mMessageBeans.get(position).filePath);
+                    FileUtil.openFileByPath(mMessageBeans.get(position).filePath, mContext);
                 }
             });
         } else if ((holder instanceof LeftAudioInnerHolder)) {
@@ -436,22 +436,6 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     }
 
     /**
-     * 查看文件
-     * @param path 文件路径
-     */
-    private void openFileByPath(String path) {
-        File file = new File(path);
-        Log.d(TAG, "openFileByPath: " + file.getAbsolutePath());
-        Intent intent = new Intent("android.intent.action.VIEW");
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        Uri uri = FileProvider.getUriForFile(mContext, "com.example.starchat.fileprovider", file);
-        String type = FileUtil.getMIMEType(file);
-        intent.addCategory("android.intent.category.DEFAULT");
-        intent.setDataAndType(uri, type);
-        mContext.startActivity(intent);
-    }
-
-    /**
      * 接收的消息ViewHolder
      */
     public static class LeftMsgInnerHolder extends RecyclerView.ViewHolder {
@@ -566,6 +550,7 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             Glide.with(context).load(new File(messageBean.filePath)).override(500).into(mImgPhoto);
             String path;
             path = messageBean.profilePath;
+            Log.d(TAG, "setData: " + path);
             if (new File(path).exists()) {
                 Glide.with(context)
                         .load(path)

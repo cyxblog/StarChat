@@ -1,4 +1,4 @@
-package com.example.starchat;
+package com.example.starchat.others;
 
 import androidx.core.content.FileProvider;
 

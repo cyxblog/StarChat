@@ -1,7 +1,6 @@
-package com.example.starchat;
+package com.example.starchat.activity;
 
 import androidx.annotation.RequiresApi;
-import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
@@ -27,6 +26,7 @@ import android.widget.Button;
 import android.widget.ListView;
 import android.widget.TextView;
 
+import com.example.starchat.R;
 import com.example.starchat.adapter.DeviceAdapter;
 import com.example.starchat.bean.DeviceBean;
 import com.example.starchat.broadcastReceiver.WifiBroadcastReceiver;
@@ -72,7 +72,7 @@ public class MainActivity extends AppCompatActivity {
                 mDeviceRole.setText(getString(R.string.server));
                 mEditor.putString(getString(R.string.role), getString(R.string.server));
                 mEditor.apply();
-
+                //绑定Service启动服务器
                 bindServerService();
 
             } else if (wifiP2pInfo.groupFormed) {
@@ -198,7 +198,7 @@ public class MainActivity extends AppCompatActivity {
     private List<DeviceBean> mDeviceBeans = new ArrayList<>();
 
     //存储设备角色，在应用重新进入时提取内容到界面
-    private SharedPreferences mSharedPreferences = getSharedPreferences(getString(R.string.starChatData), MODE_PRIVATE);
+    private SharedPreferences mSharedPreferences;
     private SharedPreferences.Editor mEditor;
     private ServiceConnection mServiceConnection;
 
@@ -212,6 +212,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        mSharedPreferences = getSharedPreferences("starChatData", MODE_PRIVATE);
 
         //初始化界面
         initView();
@@ -392,7 +394,7 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * 使用WifiP2pManager的cancelConnect()方法取消连接，
-     * 主要是在连接阶段断开连接。
+     * 在连接阶段断开连接。
      */
     private void cancelConnect() {
         mManager.cancelConnect(mChannel, new WifiP2pManager.ActionListener() {
