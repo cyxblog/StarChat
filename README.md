@@ -9,5 +9,5 @@
 ## 使用
 在使用软件前，请打开手机的WiFi功能（并不需要接入Internet）和位置信息。如下图红框所示。
 
-![image](Screenshots/29.jpg)
+![image](Screenshots/30.jpg)
 
